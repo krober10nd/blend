@@ -1,2 +1,2 @@
 # blend
-Blend two rasters together.
+Blend two rasters together so they transistion smoothly into each other.
