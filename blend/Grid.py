@@ -1,6 +1,9 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.spatial
+from netCDF4 import Dataset
 from scipy.interpolate import RegularGridInterpolator
 
 from .idw import Invdisttree
@@ -88,6 +91,7 @@ class Grid:
             data = np.tile(data, (self.nx, self.ny))
         elif data is None:
             return
+        assert data.shape == (self.nx, self.ny)
         self.__values = data  # [: self.nx+1, : self.ny]
 
     def create_vectors(self):
@@ -198,7 +202,7 @@ class Grid:
             values=new_values,
         )
 
-    def blend_into(self, coarse, blend_width=10, p=1, nnear=3, eps=0.0):
+    def blend_into(self, coarse, blend_width=10, p=1, nnear=6, eps=0.0):
         """Blend self.Grid into the coarse one so values transition smoothly"""
         _FILL = -99999  # uncommon value
         if not isinstance(coarse, Grid):
@@ -244,6 +248,8 @@ class Grid:
         _tree = Invdisttree(_pts[known_index], _vals[known_index])
         _vals[ask_index] = _tree(_pts[ask_index], nnear=nnear, eps=eps, p=p)
 
+        plt.scatter(_pts[ask_index, 0], _pts[ask_index, 1], c=_vals[ask_index])
+        plt.show()
         # put it back
         _coarse_w_fine.values = _vals.reshape(*_coarse_w_fine.values.shape)
         return _coarse_w_fine
@@ -259,7 +265,8 @@ class Grid:
         ylabel=None,
         title=None,
         cbarlabel=None,
-        file_name=None,
+        filename=None,
+        dpi=600,
     ):
         """Visualize the values in :obj:`Grid`
         Parameters
@@ -295,8 +302,8 @@ class Grid:
             ax.set_title(title)
         if hold is False and show:
             plt.show()
-        if file_name is not None:
-            plt.savefig(file_name)
+        if filename is not None:
+            plt.savefig(filename, dpi=dpi)
         return ax
 
     def build_interpolant(self, method="linear"):
@@ -326,3 +333,97 @@ class Grid:
 
         self.eval = sizing_function
         return self
+
+
+def _extract_bounds(lons, lats, extent):
+    """Extract the indexes of the subregion"""
+    # bounds (from DEM)
+    blol, blou = np.amin(lons), np.amax(lons)
+    blal, blau = np.amin(lats), np.amax(lats)
+    # check bounds
+    if extent[0] < blol or extent[1] > blou:
+        raise ValueError(
+            "bounding box "
+            + str(extent)
+            + " exceeds DEM extents "
+            + str((blol, blou, blal, blau))
+            + "!"
+        )
+    if extent[2] < blal or extent[3] > blau:
+        raise ValueError(
+            "bounding box "
+            + str(extent)
+            + " exceeds DEM extents "
+            + str((blol, blou, blal, blau))
+            + "!"
+        )
+    # latitude lower and upper index
+    latli = np.argmin(np.abs(lats - extent[2]))
+    latui = np.argmin(np.abs(lats - extent[3])) + 1
+    # longitude lower and upper index
+    lonli = np.argmin(np.abs(lons - extent[0]))
+    lonui = np.argmin(np.abs(lons - extent[1])) + 1
+
+    return latli, latui, lonli, lonui
+
+
+def _from_netcdf(filename, extent, verbose):
+    """Read in digitial elevation model from a NetCDF file"""
+
+    if verbose > 0:
+        print("Reading in NetCDF... " + filename)
+    # well-known variable names
+    wkv_x = ["x", "Longitude", "longitude", "lon"]
+    wkv_y = ["y", "Latitude", "latitude", "lat"]
+    wkv_z = ["Band1", "z"]
+    try:
+        with Dataset(filename, "r") as nc_fid:
+            for x, y in zip(wkv_x, wkv_y):
+                for var in nc_fid.variables:
+                    if var == x:
+                        lon_name = var
+                    if var == y:
+                        lat_name = var
+            for z in wkv_z:
+                for var in nc_fid.variables:
+                    if var == z:
+                        z_name = var
+            lons = nc_fid.variables[lon_name][:]
+            lats = nc_fid.variables[lat_name][:]
+            latli, latui, lonli, lonui = _extract_bounds(lons, lats, extent)
+            topobathy = nc_fid.variables[z_name][latli:latui, lonli:lonui]
+            return (
+                (lats, slice(latli, latui)),
+                (lons, slice(lonli, lonui)),
+                topobathy,
+            )
+    except IOError:
+        print("Unable to open file...quitting")
+        quit()
+
+
+class DEM(Grid):
+    """Digitial elevation model read in from a tif or NetCDF file
+    parent class is a :class:`Grid`
+    """
+
+    def __init__(self, dem, extent, verbose=1):
+
+        basename, ext = os.path.splitext(dem)
+        if ext.lower() in [".nc"]:
+            la, lo, topobathy = _from_netcdf(dem, extent, verbose)
+        else:
+            raise ValueError(f"DEM file {self.dem} has unknown format {ext[1:]}.")
+        self.dem = dem
+        # determine grid spacing in degrees
+        lats = la[0]
+        lons = lo[0]
+        dy = np.abs(lats[1] - lats[0])
+        dx = np.abs(lons[1] - lons[0])
+        super().__init__(
+            extent=extent,
+            dx=dx,
+            dy=dy,
+        )
+        self.values = topobathy[: self.ny, : self.nx].T
+        super().build_interpolant()

@@ -1,3 +1,3 @@
-from blend.Grid import Grid
+from blend.Grid import DEM, Grid
 
-__all__ = ["Grid"]
+__all__ = ["Grid", "DEM"]
