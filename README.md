@@ -11,15 +11,13 @@ Key parameters involved in the blend are `nnear` the number of nearest neighbors
 from blend import Grid
 
 grid_coarse = Grid((0, 1, 0, 1), 1 / 100, values=1)
-grid_fine = Grid(
-    (0.40, 0.70, 0.40, 0.70), 0.30 / 10, values=5, extrapolate=False
-)
+grid_fine = Grid((0.40, 0.70, 0.40, 0.70), 1/1000, values=5)
 grid_coarse_2 = grid_fine.blend_into(grid_coarse, blend_width=1, p=1, nnear=28)
-
 grid_coarse_2.plot(vmin=1, vmax=5.0)
 ```
 
-using some NetCDF DEMs with real geophysical data. 
+using some NetCDF DEMs with real geophysical data. Note the `DEM` class which is a child class of `Grid`.
+
 ```python
  from blend import DEM
  
