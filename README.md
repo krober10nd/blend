@@ -12,7 +12,7 @@ from blend import Grid
 
 grid_coarse = Grid((0, 1, 0, 1), 1 / 100, values=1)
 grid_fine = Grid((0.40, 0.70, 0.40, 0.70), 1/1000, values=5)
-grid_coarse_2 = grid_fine.blend_into(grid_coarse, blend_width=1, p=1, nnear=28)
+grid_coarse_2 = grid_fine.blend_into(grid_coarse, blend_width=50, p=1, nnear=28)
 grid_coarse_2.plot(vmin=1, vmax=5.0)
 ```
 
