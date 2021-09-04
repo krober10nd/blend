@@ -1,10 +1,20 @@
 # blend
 Blend two rasters together so they transition smoothly into each other.
 
-# References 
+# Example
 
-J.P. Leitão, L.M. de Sousa, Towards the optimal fusion of high-resolution Digital Elevation Models for detailed urban flood assessment, Journal of Hydrology, Volume 561, June 2018, Pages 651-661, DOI: 10.1016/j.jhydrol.2018.04.043. 
+Using inverse distance weighting interpolation, a buffer region around the inner nest is smoothed to blend smoothly into the outer grid.
 
-L.M. de Sousa, J.P. Leitão, Improvements to DEM Merging with r.mblend. In Proceedings of the 4th International Conference on Geographical Information Systems Theory, Applications and Management - Volume 1: GISTAM, March 2018, pages 42-49. ISBN 978-989-758-294-3 DOI: 10.5220/0006672500420049. 
+```python
+import numpy as np
 
-J.P. Leitão, D. Prodanovic, C. Maksimovic, Improving merge methods for grid-based digital elevation models, Computers & Geosciences, Volume 88, March 2016, Pages 115-131, ISSN 0098-3004, DOI: 10.1016/j.cageo.2016.01.001.
+from blend import Grid
+
+grid_coarse = Grid((0, 1, 0, 1), 1 / 100, values=np.ones((100, 100)), extrapolate=True)
+grid_fine = Grid(
+    (0.40, 0.70, 0.40, 0.70), 0.30 / 10, values=np.ones((10, 10)) + 1, extrapolate=False
+)
+grid_coarse_2 = grid_fine.blend_into(grid_coarse, blend_width=3, p=1, nnear=100)
+
+grid_coarse_2.plot(vmin=0, vmax=2.0)
+```
